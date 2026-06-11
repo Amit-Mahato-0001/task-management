@@ -15,7 +15,6 @@ interface Task {
   description: string | null;
   status: string;
   assignee: { email: string } | null;
-  creator: { email: string } | null;
 }
 
 interface UserProfile {
@@ -32,6 +31,8 @@ export default function Home() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [assigneeId, setAssigneeId] = useState("");
+
+  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 
   useEffect(() => {
     const getSession = async () => {
@@ -64,7 +65,6 @@ export default function Home() {
 
     const fetchData = async () => {
       const token = session.access_token;
-      const backendUrl = "http://localhost:5000";
 
       try {
         const tasksRes = await fetch(`${backendUrl}/api/tasks`, {
@@ -100,7 +100,7 @@ export default function Home() {
     };
 
     fetchData();
-  }, [session, loading]);
+  }, [session, loading, backendUrl]);
 
   const signInWithGoogle = async () => {
     try {
@@ -128,7 +128,6 @@ export default function Home() {
     if (!title || !assigneeId) return;
     const token = session?.access_token;
     if (!token) return;
-    const backendUrl = "http://localhost:5000";
 
     try {
       const res = await fetch(`${backendUrl}/api/tasks`, {
@@ -161,7 +160,6 @@ export default function Home() {
   const updateStatus = async (taskId: string, status: string) => {
     const token = session?.access_token;
     if (!token) return;
-    const backendUrl = "http://localhost:5000";
 
     try {
       const res = await fetch(`${backendUrl}/api/tasks/${taskId}`, {
@@ -247,7 +245,6 @@ export default function Home() {
                 <p style={{ color: "#6b7280" }}>{task.description || "No description"}</p>
                 <p>Status: <strong>{task.status}</strong></p>
                 <p>Assignee: {task.assignee?.email || "Unassigned"}</p>
-                <p>Creator: {task.creator?.email || "Unknown"}</p>
                 <select value={task.status} onChange={(e) => updateStatus(task.id, e.target.value)}>
                   <option value="Open">Open</option>
                   <option value="In Progress">In Progress</option>
