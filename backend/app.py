@@ -11,11 +11,18 @@ from email_service import send_task_created_email, send_task_completed_email
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
 
-supabase = get_supabase_client()  # This should use anon key by default
+# CORS configuration 
+FRONTEND_URLS = [
+    "http://localhost:3000",                         
+    "https://task-management-frontend-ogh3.onrender.com" 
+]
 
-# Optional: create a separate admin client with service role key for checking table existence
+CORS(app, resources={r"/api/*": {"origins": FRONTEND_URLS}}, supports_credentials=True)
+
+supabase = get_supabase_client() 
+
+# create a separate admin client with service role key for checking table existence
 service_key = os.getenv("SUPABASE_SERVICE_KEY")
 if service_key:
     from supabase import create_client
@@ -24,14 +31,14 @@ else:
     supabase_admin = None  # fallback to regular client
 
 # ------------------------------------------------------------
-# Helper: ensure profile exists (as before, but with upsert fix)
+# Helper: ensure profile exists
 # ------------------------------------------------------------
 def ensure_profile(user):
     if not user:
         return None
     user_id = user.get("id")
     try:
-        # Use eq filter (should work now if supabase client is correct)
+        # Use eq filter
         response = supabase.table("profiles").select("*").eq("id", user_id).execute()
         if response.data:
             return response.data[0]
@@ -52,7 +59,7 @@ def ensure_profile(user):
         return None
 
 # ------------------------------------------------------------
-# Get user from token (same as before)
+# Get user from token
 # ------------------------------------------------------------
 def get_user_from_request():
     auth_header = request.headers.get("Authorization")
@@ -113,7 +120,7 @@ def list_tasks():
 
     profile_id = user.get("id")
     try:
-        # Fetch all tasks (RLS will filter based on policies, but we also filter in code)
+        # Fetch all tasks
         response = supabase.table("tasks").select("*").execute()
         all_tasks = response.data or []
         filtered = [t for t in all_tasks if t.get("creator_id") == profile_id or t.get("assignee_id") == profile_id]
@@ -151,7 +158,7 @@ def create_task():
         if not result.data:
             return jsonify({"error": "Failed to create task"}), 500
 
-        # Send email notification (optional)
+        # Send email notification
         assignee = supabase.table("profiles").select("email").eq("id", assignee_id).execute()
         if assignee.data and assignee.data[0].get("email"):
             send_task_created_email(assignee.data[0]["email"], title)
@@ -209,10 +216,14 @@ def list_users():
 
 @app.after_request
 def apply_cors(response):
-    response.headers["Access-Control-Allow-Origin"] = "*"
+    # The CORS extension already handles headers, but we keep this for extra safety
+    origin = request.headers.get("Origin")
+    if origin in FRONTEND_URLS:
+        response.headers["Access-Control-Allow-Origin"] = origin
     response.headers["Access-Control-Allow-Headers"] = "Authorization,Content-Type"
     response.headers["Access-Control-Allow-Methods"] = "GET,POST,PATCH,OPTIONS"
     return response
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False)
